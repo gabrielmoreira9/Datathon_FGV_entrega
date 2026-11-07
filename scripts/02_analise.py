@@ -15,7 +15,7 @@ FIG, TAB = f"{ROOT}/output/figs", f"{ROOT}/output/tables"
 os.makedirs(FIG, exist_ok=True); os.makedirs(TAB, exist_ok=True)
 NAVY, TEAL, ORANGE, GRAY, GOLD = "#0B2545", "#1B98E0", "#E4572E", "#8D99AE", "#F4A259"
 COL = {"spot": GRAY, "put": TEAL, "collar": NAVY, "dgh": ORANGE}
-NAME = {"spot": "C1 Spot", "put": "C2 Protective Put", "collar": "C3 Zero-Cost Collar", "dgh": "C4 Delta-Gamma Hedge"}
+NAME = {"spot": "C1 Spot", "put": "C2 Protective Put", "collar": "C3 Zero-Cost Collar", "dgh": "C4 Short Iron Butterfly + Hedge de Delta"}
 plt.rcParams.update({"font.size": 10, "axes.spines.top": False, "axes.spines.right": False,
                      "axes.titleweight": "bold", "axes.titlesize": 11, "savefig.dpi": 200,
                      "axes.grid": True, "grid.alpha": 0.25})

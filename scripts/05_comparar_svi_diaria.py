@@ -27,7 +27,7 @@ STRATEGY_NAMES = {
     "spot": "C1 Spot",
     "put": "C2 Protective Put",
     "collar": "C3 Zero-Cost Collar",
-    "dgh": "C4 Delta-Gamma Hedge",
+    "dgh": "C4 Short Iron Butterfly + Hedge de Delta",
 }
 
 

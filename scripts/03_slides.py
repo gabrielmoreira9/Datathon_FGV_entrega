@@ -100,7 +100,7 @@ with PdfPages(OUT) as pdf:
     fig.text(0.06, 0.565, "Black-76 inverso · Superfície SVI livre de arbitragem · Gregas de 1ª e 2ª ordem · Backtest de 4 carteiras (Deribit 2024–2026)",
              color="#BFD7EA", fontsize=12.5, style="italic")
     NT = f"{(S['BTC_funnel'][0]+S['ETH_funnel'][0])/1e3:.0f}"
-    pill = [("Dados reais Deribit", f"{NT} mil negócios de opções, 82 superfícies SVI diárias, 2,8 anos de séries diárias (BTC e ETH)"),
+    pill = [("Dados reais Deribit", f"{NT} mil negócios de opções, {len([f for f in os.listdir(f'{ROOT}/data/processed/surfaces') if f.endswith('.pkl')])} superfícies SVI diárias, 2,8 anos de séries diárias (BTC e ETH)"),
             ("Motor quantitativo", f"{S['svi_slices']} fatias SVI · RMSE mediano {num(S['svi_rmse_med'])} pt de vol · R² {num(S['svi_r2_med'],3)}"),
             ("Resultado-chave (BTC)", f"Collar: vol {pct(b.loc[C1,'Volatilidade'],0)}→{pct(b.loc[C3,'Volatilidade'],0)}, MDD {pct(b.loc[C1,'MDD'],0)}→{pct(b.loc[C3,'MDD'],0)}, CVaR99 −{pct(1-b.loc[C3,'CVaR 99% (1d)']/b.loc[C1,'CVaR 99% (1d)'],0)} com Sharpe {num(b.loc[C3,'Sharpe'])} vs {num(b.loc[C1,'Sharpe'])}")]
     for i, (t, d) in enumerate(pill):
@@ -193,7 +193,7 @@ with PdfPages(OUT) as pdf:
     img(fig, "s06_densidade_bl", [0.60, 0.05, 0.38, 0.28])
     text_block(fig, 0.04, 0.31, [
         f"Nível: a vol ATM 30d do BTC saltou de {pct(S['BTC_2025-09-18_atm'],0)} (18/09/25) para {pct(S['BTC_2024-08-05_atm'],0)} no crash de 05/08/24; o RR 25Δ foi de {num(S['BTC_2025-09-18_rr']*100,1)} para {num(S['BTC_2024-08-05_rr']*100,1)} pts.",
-        f"Inclinação: o skew 25Δ ficou negativo (puts mais caras) em {pct(S['rr_neg_share'],0)} das 82 datas — a 'demanda por seguro' domina desde 2025, invertendo o padrão de 'call skew' de 2024.",
+        f"Inclinação: o skew 25Δ ficou negativo (puts mais caras) em {pct(S['rr_neg_share'],0)} das datas analisadas — sinal de demanda por seguro, com variação entre regimes.",
         f"Poder preditivo: correlação de Spearman entre o RR na rolagem e o retorno dos 30 dias seguintes ρ = {num(S['skew_ret30_rho'])} (p = {num(S['skew_ret30_p'])}, n = {S['skew_n']}); com o drawdown, ρ = {num(S['skew_mdd30_rho'])} (p = {num(S['skew_mdd30_p'])}). O skew descreve o medo, mas não antecipa quedas de forma significativa.",
     ], width=95, size=10.5)
     pdf.savefig(fig); plt.close(fig)
@@ -215,7 +215,7 @@ with PdfPages(OUT) as pdf:
     rules = [("C1 Spot", GRAY, "100% comprado no ativo (benchmark)."),
              ("C2 Protective Put", TEAL, "Spot + put 20Δ com vencimento na próxima rolagem (~30d)."),
              ("C3 Zero-Cost Collar", NAVY, "Spot + put 25Δ − call com K₂ tal que C(K₂) = P(K₁): prêmio líquido zero."),
-             ("C4 Delta-Gamma Hedge", ORANGE, "Caixa em USD + venda de straddle ATM + compra de asas 10Δ (gamma limitado); Δ zerado via perpétuo quando |Δ| > 0,10·nocional.")]
+             ("C4 Short Iron Butterfly + Hedge de Delta", ORANGE, "Caixa em USD + straddle ATM vendido + asas 10Δ compradas; short gamma. O delta é ajustado via perpétuo quando |Δ| > 0,10·nocional.")]
     y = 0.84
     for t, c, d in rules:
         fig.add_artist(Rectangle((0.035, y - 0.075), 0.006, 0.07, transform=fig.transFigure, color=c))
@@ -241,7 +241,7 @@ with PdfPages(OUT) as pdf:
         d = mm[cols].copy(); d.columns = short
         for k in ["Ret.", "Vol", "α", "MDD", "CVaR99"]: d[k] = d[k].map(lambda x: pct(x, 1))
         for k in ["Sharpe", "Sortino", "Calmar"]: d[k] = d[k].map(lambda x: num(x, 2))
-        d.index = ["C1 Spot", "C2 Put 20Δ", "C3 Collar", "C4 ΔΓ-Hedge"]
+        d.index = ["C1 Spot", "C2 Put 20Δ", "C3 Collar", "C4 Iron fly + hedge Δ"]
         fig.text(0.625, 0.855 - j * 0.24, c, fontsize=13, fontweight="bold", color=NAVY)
         table(fig, [0.675, 0.64 - j * 0.24, 0.31, 0.2], d, size=8.6)
     items = [("h", "Leitura"),

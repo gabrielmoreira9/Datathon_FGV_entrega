@@ -11,21 +11,23 @@ atribuição de P&L por Série de Taylor e backtest de 4 carteiras com custos re
 **Achado central:** não existe hedge universal. Cortar quedas extremas funciona nas duas moedas; vender a cauda direita
 (collar) só compensa onde altas extremas são raras — BTC teve 3 meses > +20% em 33 (collar vence), ETH teve 7 (put vence).
 
-## Resultados (01/02/2024 – 05/11/2026, líquidos de custos)
+## Resultados (01/02/2024 – 05/11/2026, custos estimados)
+
+Os custos usam taxas oficiais, funding observado e um meio-spread mediano medido no snapshot de 05/11/2026 aplicado ao histórico. Portanto, os resultados líquidos são estimativas, não uma reconstrução de execução histórica. A tabela de sensibilidade em `output/tables/sensibilidade_custos.csv` mostra o efeito de reduzir/aumentar os custos modelados em 50%.
 
 | BTC | Ret. a.a. | Vol | Sharpe | MDD | CVaR 99% (1d) |
 |---|---|---|---|---|---|
 | C1 Spot | 22,8% | 45,7% | 0,36 | −53,0% | 9,2% |
 | C2 Protective Put 20Δ | 15,2% | 37,7% | 0,27 | −44,1% | 6,6% |
 | C3 Zero-Cost Collar | 12,2% | 22,3% | 0,33 | −29,6% | 4,6% |
-| C4 Delta-Gamma Hedge | 5,4% | 8,2% | 0,16 | −6,9% | 2,4% |
+| C4 Short Iron Butterfly + Hedge de Delta | 5,4% | 8,2% | 0,16 | −6,9% | 2,4% |
 
 | ETH | Ret. a.a. | Vol | Sharpe | MDD | CVaR 99% (1d) |
 |---|---|---|---|---|---|
 | C1 Spot | −1,0% | 66,4% | −0,08 | −66,9% | 13,9% |
 | C2 Protective Put 20Δ | 4,4% | 52,5% | 0,01 | −58,2% | 8,6% |
 | C3 Zero-Cost Collar | −12,1% | 29,6% | −0,57 | −51,0% | 6,3% |
-| C4 Delta-Gamma Hedge | −7,9% | 11,9% | −1,02 | −23,2% | 4,1% |
+| C4 Short Iron Butterfly + Hedge de Delta | −7,9% | 11,9% | −1,02 | −23,2% | 4,1% |
 
 Tabelas completas (Sortino, Calmar, Alpha de Jensen, Beta, VaR, custos) em `output/tables/metricas_*.csv`.
 
@@ -39,7 +41,7 @@ src/quant/
   backtest.py  Simulador das 4 carteiras e bateria de métricas
 scripts/
   coletar_dados_deribit.py / coletar_dados_parte2.py   coleta via API pública Deribit (sem chave)
-  01_calibrar_superficies.py   calibra 82 superfícies SVI (BTC e ETH) -> data/processed/surfaces
+  01_calibrar_superficies.py   calibra superfícies SVI diárias (BTC e ETH) -> data/processed/surfaces
   02_analise.py                backtests, métricas, figuras e output/tables/resumo.json
   03_slides.py                 gera output/Datathon_FGV_Derivativos_Cripto.pdf (10 slides)
 data/raw/          dados brutos da Deribit (CSV.gz)
@@ -50,7 +52,7 @@ output/figs, output/tables, output/*.pdf
 
 ```bash
 pip install numpy scipy pandas matplotlib requests
-python scripts/coletar_dados_deribit.py     # opcional: dados já incluídos em data/raw
+python scripts/coletar_dados_deribit.py     # coleta dados-base via API pública
 python scripts/coletar_dados_parte2.py      # (mova as saídas para data/raw/)
 python scripts/04_coletar_trades_diarios.py # amplia trades de opções para todos os dias
 python scripts/01_calibrar_superficies.py   # ~20 min, idempotente (pode ser interrompido e retomado)
@@ -63,7 +65,7 @@ Para recalcular do zero, apague `data/processed/` (as superfícies e os backtest
 
 ## Dados
 
-API pública da Deribit (`history.deribit.com` e `www.deribit.com/api/v2/public`), BTC e ETH:
+API pública da Deribit (`history.deribit.com` e `www.deribit.com/api/v2/public`), BTC e ETH. Os arquivos brutos e caches processados não são versionados; execute os coletores para reproduzir a análise:
 
 - negócios de opções em todos os dias de 01/02/2024 a 07/11/2026: 1.011 arquivos diários por moeda e 20,5 milhões de negócios no total;
 - snapshot da cadeia completa em 05/11/2026 (mark_iv, bid/ask, OI) e futuros datados;
@@ -88,10 +90,11 @@ devem ser executados separadamente depois da coleta.
   - calendário: w(k,τ) não decrescente.
   
   Fatias mal ajustadas não são usadas como piso de calendário.
-- **Backtest.** Rolagem mensal com carteira autofinanciada (nocional = NAV/S). Entre rolagens, a marcação usa σ_SVI·DVOL_t/DVOL_rolagem.
+- **Backtest principal.** Rolagem mensal com carteira autofinanciada (nocional = NAV/S). Entre rolagens, a marcação usa σ_SVI·DVOL_t/DVOL_rolagem. O script `05_comparar_svi_diaria.py` repete a marcação com superfícies SVI diárias mantendo as mesmas rolagens.
+- **C4.** Short iron butterfly (straddle ATM vendido e asas 10Δ compradas), com hedge dinâmico de delta via perpétuo. É uma estratégia short gamma; o hedge de delta não elimina gamma.
 - **Custos.**
   - taxa de opção de 0,03% do subjacente, com teto de 12,5% do prêmio;
-  - meio spread bid-ask medido no livro;
+- meio spread bid-ask medido no snapshot atual e aplicado como proxy ao histórico; a tabela de sensibilidade varia os custos totais modelados;
   - taxa de entrega de 0,015%;
   - perpétuo taker de 0,05%;
   - funding horário real;

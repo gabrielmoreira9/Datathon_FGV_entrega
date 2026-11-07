@@ -184,9 +184,12 @@ SUM["svi_g_ok"] = float(q.g_ok.mean()); SUM["svi_lee_ok"] = float(q.lee_ok.mean(
 cal = []
 for c in ["BTC", "ETH"]:
     for d, r in SURF[c].items():
+        if len(r["slices"]) < 2:
+            continue  # sem duas maturidades nao ha teste de arbitragem de calendario
         kk = np.linspace(-0.3, 0.3, 61); W = np.array([svi.svi_w(kk, s["params"]) for s in r["slices"]])
         cal.append(np.mean(np.diff(W, axis=0) >= -1e-5))
-SUM["svi_calendar_ok"] = float(np.mean(cal))
+SUM["svi_calendar_n"] = int(len(cal))
+SUM["svi_calendar_ok"] = float(np.mean(cal)) if cal else np.nan
 
 # ======================= 5. Superficies 3D calma vs crise + skew ======================
 def surf3d(ax, rec, title, zmax):

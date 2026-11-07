@@ -55,6 +55,7 @@ python scripts/coletar_dados_parte2.py      # (mova as saídas para data/raw/)
 python scripts/04_coletar_trades_diarios.py # amplia trades de opções para todos os dias
 python scripts/01_calibrar_superficies.py   # ~20 min, idempotente (pode ser interrompido e retomado)
 python scripts/02_analise.py                # ~2 min
+python scripts/05_comparar_svi_diaria.py    # compara marcação por DVOL e SVI diária; skew diário
 EQUIPE="Equipe: Nome 1 · Nome 2 · Nome 3" REPO="github.com/usuario/repo" python scripts/03_slides.py
 ```
 
@@ -64,7 +65,7 @@ Para recalcular do zero, apague `data/processed/` (as superfícies e os backtest
 
 API pública da Deribit (`history.deribit.com` e `www.deribit.com/api/v2/public`), BTC e ETH:
 
-- negócios de opções em 41 datas por moeda: o 1º dia de cada mês de fev/2024 a nov/2026 mais 7 dias de crise e de calmaria; 951 mil negócios no total;
+- negócios de opções em todos os dias de 01/02/2024 a 07/11/2026: 1.011 arquivos diários por moeda e 20,5 milhões de negócios no total;
 - snapshot da cadeia completa em 05/11/2026 (mark_iv, bid/ask, OI) e futuros datados;
 - perpétuo diário, funding horário e índice DVOL desde jan/2024.
 
@@ -102,7 +103,7 @@ Implementação de código e análise com apoio de assistente de IA (Claude, Ant
 
 ## Limitações
 
-- A marcação intra-mês escala a superfície pelo DVOL em vez de recalibrar a superfície completa todo dia.
-- A amostra tem 34 rolagens.
-- O spread vem do livro atual.
-- O poder preditivo do skew 25Δ não foi significativo (Spearman ρ ≈ −0,10; p ≈ 0,44).
+- O backtest principal (`02_analise.py`) mantém a marcação intra-mês escalada pelo DVOL. `05_comparar_svi_diaria.py` compara esse baseline com a marcação pela superfície SVI diária, mantendo as rolagens mensais.
+- O backtest principal continua com 34 rolagens mensais; a nova comparação não altera essa frequência.
+- O spread vem do livro atual, pois não há snapshots históricos de bid/ask.
+- O teste original do skew 25Δ usa as datas de rolagem (Spearman ρ ≈ −0,10; p ≈ 0,44). A análise diária adicional mantém o horizonte de 30 dias e usa bootstrap em blocos de 30 dias para refletir a sobreposição das janelas.

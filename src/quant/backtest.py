@@ -8,6 +8,8 @@ Marcacao diaria das opcoes:
 Custos: taxa de opcao 0.03% do subjacente (teto 12.5% do premio) + meio spread bid-ask empirico,
 taxa de entrega 0.015% no vencimento, taxa taker de 0.05% no perpetuo e funding horario real.
 """
+from bisect import bisect_right
+
 import numpy as np
 import pandas as pd
 from scipy.optimize import brentq
@@ -18,21 +20,46 @@ FEE_OPT, FEE_DELIV, FEE_PERP = 0.0003, 0.00015, 0.0005
 
 
 class Market:
-    def __init__(self, daily, rolls):
-        """daily: DataFrame (S, dvol, funding_d) indexado por data; rolls: dict data -> registro pkl."""
+    def __init__(self, daily, rolls, daily_surfaces=None):
+        """daily: (S, dvol, funding_d); rolls: superficies nas rolagens mensais.
+
+        Se `daily_surfaces` for fornecido, cada data usa a ultima superficie SVI
+        diaria disponivel para marcacao, sem escalar IV pelo DVOL. As datas de
+        `rolls` continuam definindo quando a carteira troca as opcoes.
+        """
         self.d = daily
         self.rolls = rolls
         self.roll_dates = sorted(rolls)
+        self.daily_surfaces = daily_surfaces
+        self.daily_surface_dates = sorted(daily_surfaces) if daily_surfaces is not None else []
+        self._surface_cache = {}
+
+    def _surface(self, rec):
+        key = rec["date"]
+        if key not in self._surface_cache:
+            self._surface_cache[key] = SVISurface(rec["slices"])
+        return self._surface_cache[key]
 
     def ctx(self, date):
         """Superficie, DVOL de ancoragem e r_imp vigentes em `date`."""
+        if self.daily_surfaces is not None:
+            idx = bisect_right(self.daily_surface_dates, date) - 1
+            if idx >= 0:
+                sd = self.daily_surface_dates[idx]
+                rec = self.daily_surfaces[sd]
+                rd = self.roll_dates[bisect_right(self.roll_dates, date) - 1]
+                roll_term = self.rolls[rd]["term"]
+                r = float(roll_term[(roll_term.tau > 10 / 365) & (roll_term.tau < 0.3)].r_imp.median())
+                return rec, self._surface(rec), None, r
         rd = max(x for x in self.roll_dates if x <= date)
         rec = self.rolls[rd]
         term = rec["term"]
         r = float(term[(term.tau > 10 / 365) & (term.tau < 0.3)].r_imp.median())
-        return rec, SVISurface(rec["slices"]), float(self.d.dvol.get(rd, np.nan)), r
+        return rec, self._surface(rec), float(self.d.dvol.get(rd, np.nan)), r
 
     def vol(self, surf, dvol_anchor, date, F, K, tau):
+        if self.daily_surfaces is not None and dvol_anchor is None:
+            return surf.iv(np.log(np.asarray(K) / F), max(tau, 1 / 365))
         scale = self.d.dvol.loc[date] / dvol_anchor if np.isfinite(dvol_anchor) else 1.0
         return surf.iv(np.log(np.asarray(K) / F), max(tau, 1 / 365)) * scale
 

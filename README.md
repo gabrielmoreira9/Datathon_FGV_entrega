@@ -13,7 +13,7 @@ atribuição de P&L por Série de Taylor e backtest de 4 carteiras com custos re
 
 ## Resultados (01/02/2024 – 05/11/2026, custos estimados)
 
-Os custos usam taxas oficiais, funding observado e um meio-spread mediano medido no snapshot de 05/11/2026 aplicado ao histórico. Portanto, os resultados líquidos são estimativas, não uma reconstrução de execução histórica. A tabela de sensibilidade em `output/tables/sensibilidade_custos.csv` mostra o efeito de reduzir/aumentar os custos modelados em 50%.
+Os custos usam taxas oficiais, funding observado e um meio-spread mediano medido no snapshot de 05/11/2026 aplicado ao histórico. Portanto, os resultados líquidos são estimativas, não uma reconstrução de execução histórica. A tabela de sensibilidade em `output/tables/sensibilidade_custos.csv` mostra os cenários de 50%, 100% (base) e 150% dos custos modelados.
 
 | BTC | Ret. a.a. | Vol | Sharpe | MDD | CVaR 99% (1d) |
 |---|---|---|---|---|---|

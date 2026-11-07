@@ -2,7 +2,8 @@
 
 Mantem as rolagens mensais e os custos atuais. Tambem repete o teste de skew
 do README em datas mensais e em todas as datas, usando os mesmos resultados
-futuros de 30 dias. Uso: python scripts/05_comparar_svi_diaria.py
+futuros de 30 dias. Calcula ainda a sensibilidade dos custos do backtest
+mensal por DVOL. Uso: python scripts/05_comparar_svi_diaria.py
 """
 import glob
 import os
@@ -162,12 +163,45 @@ def main():
 
     pd.DataFrame(rows).to_csv(os.path.join(TABLE_DIR, "comparacao_svi_diaria.csv"), index=False)
 
+    # Sensibilidade do backtest-base: mesmas rolagens, dados e metodologia,
+    # alterando apenas o multiplicador dos custos modelados.
+    sensitivity_rows = []
+    for coin in COINS:
+        monthly_rolls = {day: rec for day, rec in surfaces[coin].items() if day.day == 1}
+        spread = half_spread(coin)
+        start, end = min(monthly_rolls), daily_data[coin].index[-1]
+        market = bt.Market(daily_data[coin], monthly_rolls)
+        for factor, label in [(0.5, "50%"), (1.0, "100% (base)"), (1.5, "150%")]:
+            results = {
+                kind: bt.run_strategy(
+                    market, kind, start, end, spread, cost_mult=factor
+                )
+                for kind in KINDS
+            }
+            for kind, result in results.items():
+                metrics = bt.metrics(result.ret, results["spot"].ret)
+                sensitivity_rows.append({
+                    "cenário": label,
+                    "fator_custo": factor,
+                    "moeda": coin,
+                    "carteira": STRATEGY_NAMES[kind],
+                    **metrics,
+                    "Custos totais (% NAV ini.)": float(
+                        result.costs.iloc[-1] / result.nav.iloc[0]
+                    ),
+                })
+        print(f"{coin}: concluida sensibilidade de custos", flush=True)
+
+    pd.DataFrame(sensitivity_rows).to_csv(
+        os.path.join(TABLE_DIR, "sensibilidade_custos.csv"), index=False
+    )
+
     skew = pd.concat([forward_skew_rows(c, daily_data[c], surfaces[c]) for c in COINS],
                      ignore_index=True)
     skew.to_csv(os.path.join(TABLE_DIR, "skew_preditivo_diario.csv"), index=False)
     skew_summary(skew).to_csv(os.path.join(TABLE_DIR, "skew_preditivo_comparacao.csv"), index=False)
-    print("Salvos: comparacao_svi_diaria.csv, skew_preditivo_diario.csv e "
-          "skew_preditivo_comparacao.csv", flush=True)
+    print("Salvos: comparacao_svi_diaria.csv, sensibilidade_custos.csv, "
+          "skew_preditivo_diario.csv e skew_preditivo_comparacao.csv", flush=True)
 
 
 if __name__ == "__main__":

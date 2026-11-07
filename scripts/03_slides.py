@@ -12,6 +12,8 @@ FIG, TAB = f"{ROOT}/output/figs", f"{ROOT}/output/tables"
 OUT = f"{ROOT}/output/Datathon_FGV_Derivativos_Cripto.pdf"
 S = json.load(open(f"{TAB}/resumo.json"))
 M = {c: pd.read_csv(f"{TAB}/metricas_{c}.csv", index_col=0) for c in ["BTC", "ETH"]}
+COMPARISON = pd.read_csv(f"{TAB}/comparacao_svi_diaria.csv")
+COST_SENS = pd.read_csv(f"{TAB}/sensibilidade_custos.csv")
 
 TEAM = os.environ.get("EQUIPE", "Equipe: [Integrante 1] · [Integrante 2] · [Integrante 3]")
 REPO = os.environ.get("REPO", "github.com/[equipe]/cripto-derivativos-fgv")
@@ -251,34 +253,40 @@ with PdfPages(OUT) as pdf:
     text_block(fig, 0.03, 0.37, items, width=140, size=11.2, gap=0.01)
     pdf.savefig(fig); plt.close(fig)
 
-    # ------------------------------------------------------------------ 10 CONCLUSAO
-    fig = new_slide(10, "Conclusões, aplicabilidade institucional e código aberto",
-                    "Infraestrutura quantitativa completa, reprodutível e honesta sobre o custo da proteção")
-    pillars = [("Inovação metodológica", TEAL,
-                ["Black-76 sobre o forward implícito por paridade put-call inversa, sem r arbitrária",
-                 "Raw SVI sequencial com penalização de butterfly, Lee e calendário + janela síncrona de liquidez",
-                 "Gregas duais (USD × moeda) e atribuição de P&L de 2ª ordem (Vanna/Volga)"]),
-               ("Robustez empírica", NAVY,
-                [f"{(S['BTC_funnel'][0]+S['ETH_funnel'][0])/1e3:.0f} mil negócios de opções, {S['svi_slices']} fatias SVI, BTC e ETH, regimes de calma e 4 crises",
-                 "Custos reais: taxas, spread do livro, funding horário",
-                 f"Achado central: não existe hedge universal. Cortar 'Disasters' funciona nas duas moedas; vender os 'Miracles' (collar) só compensa onde eles são raros — BTC ({S['BTC_miracles']} meses > +20%) sim, ETH ({S['ETH_miracles']}) não"]),
-               ("Infraestrutura open-source", ORANGE,
-                ["Biblioteca Python vetorizada (numpy/scipy/pandas): black76, svi, data, backtest",
-                 "3 scripts reprodutíveis: coleta → calibração → análise/slides",
-                 f"Repositório: {REPO}"])]
-    for i, (t, c, its) in enumerate(pillars):
-        x = 0.03 + i * 0.322
-        fig.add_artist(FancyBboxPatch((x, 0.40), 0.30, 0.43, boxstyle="round,pad=0.004,rounding_size=0.012", transform=fig.transFigure, fc=LIGHT, ec=c, lw=1.8))
-        fig.add_artist(Rectangle((x, 0.78), 0.30, 0.05, transform=fig.transFigure, color=c))
-        fig.text(x + 0.015, 0.805, t, fontsize=14, fontweight="bold", color="white", va="center")
-        text_block(fig, x + 0.012, 0.755, its, width=40, size=12, gap=0.018)
-    text_block(fig, 0.03, 0.31, [("h", "Aplicações no Brasil"),
-        "Fundos multimercado e de cripto (CVM 175): política de hedge com orçamento de CVaR e regra de rolagem auditável.",
-        "ETFs e COEs estruturados na B3: precificação do 'capital protegido' com superfície SVI em vez de vol fixa.",
-        "Protocolos DeFi de opções: marcação livre de arbitragem e monitoramento de Gregas em tempo real."], width=95, size=11.2, gap=0.008)
-    callout(fig, [0.66, 0.08, 0.31, 0.27], "Limitações e próximos passos",
-            "Marcação intra-mês via escala DVOL (não toda a superfície diária); amostra de 34 rolagens mensais; spread estimado no livro atual. Próximo: superfícies diárias completas, modelos de salto (Bates/SVJ) e otimização de hedge sob restrição de CVaR.", width=46, size=10.4, color=ORANGE)
-    fig.text(0.03, 0.045, "Créditos: implementação de código e análise com apoio de assistente de IA (Claude, Anthropic); concepção, revisão e conclusões da equipe.",
-             fontsize=8.5, color=GRAY, style="italic")
+    # ------------------------------------------------------------------ 10 ROBUSTEZ
+    fig = new_slide(10, "Robustez: marcação diária e sensibilidade a custos",
+                    "As rolagens permanecem mensais; as tabelas abaixo isolam mudanças de marcação e de custos")
+    comp = COMPARISON[COMPARISON.carteira.str.contains("C2|C3|C4", regex=True)].copy()
+    comp["carteira"] = comp["carteira"].str.extract(r"^(C[234])")[0]
+    comp["Retorno a.a."] = comp["Retorno a.a."].map(lambda x: pct(x, 1))
+    comp["Sharpe"] = comp["Sharpe"].map(lambda x: num(x, 2))
+    comp = comp.pivot(index=["moeda", "carteira"], columns="marcacao",
+                      values=["Retorno a.a.", "Sharpe"])
+    comp.columns = ["DVOL ret.", "SVI diária ret.", "DVOL Sharpe", "SVI diária Sharpe"]
+    table(fig, [0.04, 0.50, 0.92, 0.27], comp, size=8.5,
+          col_w=[0.22, 0.22, 0.22, 0.22])
+    fig.text(0.04, 0.475,
+             "Resultado: C4 de ETH piora com SVI diária; C2 e C3 mudam pouco. "
+             "As janelas de 30 dias do teste de skew se sobrepõem: datas diárias não são observações independentes.",
+             fontsize=10.8, color=INK, va="top")
+
+    sens = COST_SENS[COST_SENS.carteira.str.contains("C2|C3|C4", regex=True)].copy()
+    sens["carteira"] = sens["carteira"].str.extract(r"^(C[234])")[0]
+    sens["Retorno a.a."] = sens["Retorno a.a."].map(lambda x: pct(x, 1))
+    sens = sens.pivot(index="cenário", columns=["moeda", "carteira"], values="Retorno a.a.")
+    sens = sens.reindex(columns=pd.MultiIndex.from_product([["BTC", "ETH"], ["C2", "C3", "C4"]]))
+    sens.columns = ["BTC C2", "BTC C3", "BTC C4", "ETH C2", "ETH C3", "ETH C4"]
+    table(fig, [0.04, 0.17, 0.92, 0.24], sens, size=8.8,
+          col_w=[0.14] * 6)
+    fig.text(0.04, 0.145,
+             "Sensibilidade: retorno a.a. líquido para 50%, 100% (base) e 150% dos custos. "
+             "O spread medido no snapshot atual é uma proxy aplicada ao histórico; variar a proxy "
+             "não a transforma em spread histórico observado.",
+             fontsize=10.3, color=INK, va="top")
+    fig.text(0.04, 0.075,
+             "Conclusão: não existe hedge universal. Cortar 'Disasters' funciona nas duas moedas; "
+             f"vender os 'Miracles' favorece BTC ({S['BTC_miracles']} meses > +20%), não ETH ({S['ETH_miracles']}). "
+             f"Repositório: {REPO}",
+             fontsize=10.5, color=NAVY, fontweight="bold", va="top")
     pdf.savefig(fig); plt.close(fig)
 print("PDF:", OUT)

@@ -1,11 +1,12 @@
 """Modelo 3: Raw SVI (Gatheral, 2004) com penalizacao de arbitragem estatica.
 
 w(k) = a + b * ( rho*(k-m) + sqrt((k-m)^2 + s^2) ),  k = ln(K/F),  w = sigma^2 * tau
-Restricoes:
-  b >= 0, |rho| < 1, s > 0, a + b*s*sqrt(1-rho^2) >= 0           (variancia minima >= 0)
-  b*(1+|rho|) <= 2                                                (Roger Lee: inclinacao das asas de w <= 2)
-  g(k) >= 0  (densidade de Gatheral-Jacquier >= 0 -> sem arbitragem de butterfly)
-  w(k, tau_i) >= w(k, tau_{i-1})  (sem arbitragem de calendario; calibracao sequencial)
+Limites e penalizacoes:
+  b >= 0, |rho| < 1, s > 0                                          (limites do otimizador)
+  a + b*s*sqrt(1-rho^2) >= 0                                       (penalizacao; variancia minima >= 0)
+  b*(1+|rho|) <= 2                                                  (penalizacao de Roger Lee)
+  g(k) >= 0  (penalizacao de Gatheral-Jacquier na grade; butterfly)
+  w(k, tau_i) >= w(k, tau_{i-1})  (penalizacao de calendario sequencial)
 """
 import numpy as np
 from scipy.optimize import least_squares
@@ -80,7 +81,8 @@ def calibrate_slice(k, iv, tau, weights=None, w_floor=None, x0=None, lam=50.0):
 
 class SVISurface:
     """Superficie: fatias SVI por maturidade; interpolacao linear em variancia total ao longo de tau
-    (preserva ausencia de arbitragem de calendario entre fatias livres de arbitragem)."""
+    (a interpolacao preserva a monotonicidade de calendario somente quando as fatias
+    adjacentes ja a satisfazem em toda a grade relevante)."""
 
     def __init__(self, slices):
         self.slices = sorted(slices, key=lambda s: s["tau"])

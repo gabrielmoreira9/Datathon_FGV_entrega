@@ -58,7 +58,8 @@ python scripts/04_coletar_trades_diarios.py # amplia trades de opções para tod
 python scripts/01_calibrar_superficies.py   # ~20 min, idempotente (pode ser interrompido e retomado)
 python scripts/02_analise.py                # ~2 min
 python scripts/05_comparar_svi_diaria.py    # compara marcação por DVOL e SVI diária; skew diário
-EQUIPE="Equipe: Nome 1 · Nome 2 · Nome 3" REPO="github.com/usuario/repo" python scripts/03_slides.py
+EQUIPE= Isadora Zanetti, Gabriel Moreira, Ana Karoline, Leonardo Rodrigues. REPO= github.com/gabrielmoreira9/Datathon_FGV_entrega 
+python scripts/03_slides.py
 ```
 
 Para recalcular do zero, apague `data/processed/` (as superfícies e os backtests ficam em cache).
@@ -84,12 +85,12 @@ devem ser executados separadamente depois da coleta.
 - **Convenção inversa.** O preço em moeda é V_USD/F, com Black-76 e r = 0. Isso foi verificado no snapshot (erro mediano de 1e-5 BTC).
 - **Forward.** Sai da paridade put-call inversa C − P = 1 − K/F, calculada por hora e vencimento. Daí vem r_imp(τ) = ln(F/S)/τ.
 - **Janela síncrona.** O SVI é calibrado na janela de 4h com mais negócios do dia, porque em crises a vol intradiária varia dezenas de pontos.
-- **Calibração SVI.** Mínimos quadrados ponderados por Vega, da maturidade curta para a longa, com penalidades para:
+- **Calibração SVI.** Mínimos quadrados ponderados por Vega, da maturidade curta para a longa, com penalidades numéricas para:
   - Lee: b(1+|ρ|) ≤ 2;
   - butterfly: g(k) ≥ 0;
   - calendário: w(k,τ) não decrescente.
   
-  Fatias mal ajustadas não são usadas como piso de calendário.
+  As condições de butterfly e calendário são verificadas na grade de calibração e incentivadas por penalização, não impostas como restrições duras em todo o domínio. Fatias mal ajustadas não são usadas como piso de calendário. Na amostra processada, 99,37% dos pontos de butterfly e 99,63% das comparações de calendário passaram os testes (`output/tables/resumo.json`).
 - **Backtest principal.** Rolagem mensal com carteira autofinanciada (nocional = NAV/S). Entre rolagens, a marcação usa σ_SVI·DVOL_t/DVOL_rolagem. O script `05_comparar_svi_diaria.py` repete a marcação com superfícies SVI diárias mantendo as mesmas rolagens.
 - **C4.** Short iron butterfly (straddle ATM vendido e asas 10Δ compradas), com hedge dinâmico de delta via perpétuo. É uma estratégia short gamma; o hedge de delta não elimina gamma.
 - **Custos.**
@@ -106,7 +107,7 @@ Implementação de código e análise com apoio de assistente de IA (Claude, Ant
 
 ## Limitações
 
-- O backtest principal (`02_analise.py`) mantém a marcação intra-mês escalada pelo DVOL. `05_comparar_svi_diaria.py` compara esse baseline com a marcação pela superfície SVI diária, mantendo as rolagens mensais.
+- O backtest principal (`02_analise.py`) mantém a marcação intra-mês escalada pelo DVOL. `05_comparar_svi_diaria.py` compara esse baseline com a marcação pela superfície SVI diária, mantendo as rolagens mensais. Os resultados publicados terminam em 05/11/2026, embora a coleta bruta de negócios possa alcançar 07/11/2026.
 - O backtest principal continua com 34 rolagens mensais; a nova comparação não altera essa frequência.
 - O spread vem do livro atual, pois não há snapshots históricos de bid/ask.
 - O teste original do skew 25Δ usa as datas de rolagem (Spearman ρ ≈ −0,10; p ≈ 0,44). A análise diária adicional mantém o horizonte de 30 dias e usa bootstrap em blocos de 30 dias para refletir a sobreposição das janelas.
